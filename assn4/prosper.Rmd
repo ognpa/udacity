@@ -1,0 +1,1095 @@
+---
+Title: "ProsperEDA"
+author: "Priya Ananthram"
+date: "18 August 2015"
+output: html_document
+---
+#Univariate plot section
+```{r loading_data,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/',
+                      echo=FALSE, warning=FALSE, message=FALSE)
+loan_data_csv<-read.csv("prosperLoanData.csv")
+
+#The dataset has 113937 observation and 81 variables
+
+
+library(ggplot2)
+library(gridExtra)
+library(lubridate)
+library(dplyr)
+library(tidyr)
+library(gridExtra)
+loan_data_csv$Loan_year<-year(loan_data_csv$LoanOriginationDate)
+loan_data_csv$Loan_month<-month(loan_data_csv$LoanOriginationDate)
+loan_data_csv$Loan_closed_Date_month<-month(as.POSIXlt(loan_data_csv$ClosedDate, 
+                                                       format="%Y-%m-%d"))
+loan_data_csv$Loan_closed_Date_year<-year(as.POSIXlt(loan_data_csv$ClosedDate,
+                                                     format="%Y-%m-%d"))
+loan_data_csv$Credit_Type<-NA
+loan_data_csv[which(loan_data_csv$CreditScoreRangeUpper<=499),'Credit_Type']<-'BAD'
+loan_data_csv[which(loan_data_csv$CreditScoreRangeLower>499 ),'Credit_Type']<-'POOR'
+loan_data_csv[which(loan_data_csv$CreditScoreRangeLower>599 ),'Credit_Type']<-'FAIR'
+loan_data_csv[which(loan_data_csv$CreditScoreRangeLower>659 ),'Credit_Type']<-'GOOD'
+loan_data_csv[which(loan_data_csv$CreditScoreRangeLower>779 ),'Credit_Type']<-'VGOOD'
+
+blue.bold.italic.16.text <- element_text(angle = 90, hjust = 1,vjust=1)
+
+```
+### Loan Volume by months
+
+I want to first check if there is any variation in loan volumes.Since this data
+is US based I want to check if volumes increase or decrease during certain
+months i.e during the holiday season,Thanksgiving etc, Since people go on a 
+shopping spree during these months defaults on loans may also increase during 
+this period is this the case?
+
+
+```{r loan_volumes_by_month, cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+
+most_loans<-ggplot(aes(x=Loan_month),data=loan_data_csv)+
+geom_histogram(fill='light blue',binwidth=0.3)+
+scale_x_discrete(breaks=seq(1,12),labels=month.abb)+
+ggtitle('Loans by month')
+
+
+most_loans
+
+```
+
+Increase in loan volume during holiday season Oct,Nov,Dec,Jan can be noticed .
+
+###When are most loans defaulted?
+```{r loan_volumes_defaulted_by_month, cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+
+most_defaulted<-ggplot(aes(x=Loan_closed_Date_month,
+                           y=(..count..)/sum(..count..),
+                           label=round((..count..)/sum(..count..),2)),
+                       data=subset(loan_data_csv ,
+                                   LoanStatus %in% c('Defaulted','Chargedoff')))+
+geom_histogram(fill='light blue',binwidth=0.3)+
+  labs(y="Percent",
+       x="Months") +
+scale_x_continuous(breaks=seq(1,12),labels=month.abb)+
+ggtitle('Loans defaulted by months')
+
+grid.arrange(most_loans,most_defaulted,ncol=1)
+```
+
+This distribution is similar to loan volumes by months so defaults seem to
+increase during holiday season too
+
+
+###Loan Volumes over the years 
+I want to check if the loan volumes have changed over the years.Prosper started
+in 2005 GFC occured in 2008 so did the volumes change over that period.
+
+```{r loan_volumes_by_year ,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+
+ggplot(aes(x=Loan_year),data=loan_data_csv)+
+  geom_histogram(fill='light blue',binwidth=0.3)+
+  scale_x_continuous(breaks=seq(2005,2014))+
+  ggtitle("Loan volumes over the years")
+
+```
+
+It appears loans peaked in 2013 then in the year 2009-2010 dropped off and 
+then started picking up again.Note we do not haveall the data for 2014.
+
+It will be interesting to understand why volumes fell in 2009
+
+###Where are the most loans taken
+Which state uses Prosper and takes out most loans.
+
+```{r loan_value_by_state, cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+gg<-ggplot(aes(x=BorrowerState,ymax=max(..count..)),data=loan_data_csv)
+gg<-gg+geom_histogram(fill='light blue')
+gg<-gg+theme(axis.text.x = blue.bold.italic.16.text)
+gg<-gg+stat_bin(aes(y=..count.., label=..count..), geom="text", vjust=-.5,size=3)
+gg<-gg+ggtitle("Loans volumes by state")
+gg
+
+```
+
+From the graph CA takes out most loans
+
+
+###How long are the terms of the loan? 
+Do people take short term loans or do they take long term loans
+```{r loan_value_by_term, cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+gg<-ggplot(aes(x=Term),data=loan_data_csv)
+gg<-gg+geom_histogram(fill='light blue')
+gg<-gg+scale_x_discrete(breaks=seq(12,60,12))
+gg<-gg+ylim(0,90000)
+gg<-gg+ggtitle("Loan terms")
+gg
+```
+
+Most loans are 36 months 
+
+
+
+```{r loan_values,cache=TRUE,echo=FALSE,eval=FALSE, cache.path = 'cache/', fig.path='figure/'}
+###How much do people borrow typically?
+gg<-ggplot(aes(x=LoanOriginalAmount,ymax=max(..count..)),data=loan_data_csv)
+gg<-gg+geom_histogram(fill='light blue',binwidth=300)
+gg<-gg+scale_x_continuous(breaks=seq(1000,12000,500),limits=c(1000,12000))
+gg<-gg+ggtitle("loan original amounts spread")
+gg
+
+summary(loan_data_csv$LoanOriginalAmount)
+#Loan amount distribution is slightly positively skewed with median about 6500$.
+
+
+```
+```{r echo=FALSE,eval=FALSE }
+###How much percent are loans funded
+
+table(round(loan_data_csv$PercentFunded,2))
+#Most loans were fully funded 
+
+```
+###How much monthly loan repayment?
+```{r loan_repayments,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+
+
+ summary(loan_data_csv$MonthlyLoanPayment)
+ ggplot(aes(x=MonthlyLoanPayment,ymax=max(..count..)),data=loan_data_csv)+
+   geom_histogram(fill='lightblue',binwidth=20)+
+   scale_x_continuous(breaks=seq(0,1000,50),limits=c(0,1000))+
+   #stat_bin(aes(y=..count.., label=..count..), geom="text", vjust=-.5,size=4)+
+   ggtitle("Monthly loan payment spread")
+
+```
+
+The loan payment spread is positively skewed with the most common repayment 
+about $200
+
+###What interest are people borrowing the loans at?
+
+```{r loan_interst_rates,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+ ggplot(aes(x=BorrowerAPR),data=subset(loan_data_csv,!is.na(BorrowerAPR)))+
+ geom_histogram(binwidth=0.005,fill='light blue')+
+ xlim(c(0.0065,0.52))+
+ ggtitle("Borrower APR spread")
+ 
+```
+
+The distribution of borrowerAPR is slightly positively skewed and there is 
+spike about 0.35%
+
+###What is the prosperscore of the loans.
+Prosper score are a custom risk score built using historical Prosper data 
+applicable for loans originated after July 2009. Most loans from the graph seem 
+to be between 4-8 prosper score I guess relatively high 
+prosper scores should predict a good loan outcome . It would be intersting 
+to see if low prosper scores give higher lender yield and vice versa and 
+also if prosper scores that are high predict a good loan outcome
+
+```{r loan_prosper_score,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+ggplot(aes(x=ProsperScore,ymax=max(..count..)),
+       data=subset(loan_data_csv,
+                   !is.na(loan_data_csv$ProsperScore)))+
+
+geom_histogram(binwidth=0.4,fill='light blue')+
+scale_x_discrete(breaks=seq(1,11,1))
+```
+
+
+###What is the most common reason for the loan
+It would be intersting to understand why people are using P2P lending as opposed 
+to Banks. For lenders its obvious the yields are higher though risks should be 
+higher and due deligence work will be higher for for borrowers the Reasons I
+could include turnaround time ,low credit scores ,lower repayments .
+```{r loan_reason,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+
+ #table(loan_data_csv$ListingCategory)
+
+
+blue.bold.italic.16.text <- element_text(angle = 90, hjust = 1,vjust=1)
+ggplot(aes(x=ListingCategory..numeric.,ymax=max(..count..)),data=loan_data_csv)+
+  geom_histogram(fill='light blue',binwidth=1)+
+  scale_x_discrete(breaks=c(0:20),
+  labels=c('Not Available','Debt Consolidation', 'Home Improvement', 
+           'Business','Personal Loan','Student Use', 'Auto', 'Other', 
+           'Baby&Adoption','Boat', 'Cosmetic Procedure', 'Engagement Ring', 
+           'Green Loans', 'Household Expenses', 'Large Purchases', 
+           'Medical/Dental', 'Motorcycle', 'RV', 'Taxes', 'Vacation', 
+           'Wedding Loans'
+ ))+
+  stat_bin(aes(y=..count.., label=..count..), geom="text", vjust=-.5,size=3)+
+  theme(axis.text.x = blue.bold.italic.16.text)+
+  ggtitle("Listing category spread")
+```
+
+Most loans are for debt consolidation as seen in graph
+
+
+```{r echo=FALSE, eval=FALSE,employeed_people_profile,cache=TRUE, cache.path = 'cache/', fig.path='figure/'}
+###Do employeed people default
+
+ggplot(aes(x=LoanStatus,fill=EmploymentStatus),data=loan_data_csv)+
+geom_histogram()+
+theme(axis.text.x = blue.bold.italic.16.text)
+
+ggplot(aes(x=EmploymentStatus,ymax=max(..count..)),
+       data=subset(loan_data_csv,
+                   (LoanStatus %in% c('Defaulted','ChargedOff'))))+
+geom_histogram()+
+theme(axis.text.x = blue.bold.italic.16.text)+
+stat_bin(aes(y=..count.., label=..count..), geom="text", vjust=-.5,size=3)
+
+#Lots of full time people default .Note 522 people who have not 
+#specified employment status..
+```
+
+
+
+
+
+
+```{r echo=FALSE,eval=FALSE}
+###Has the return in Prosper been good over the year for investors
+
+#Plot->Lender yield over the years
+#Comment->Lender yield has increased year on year except for 2009 
+#We do not have the full data for 2014.
+
+ggplot(aes(x=LenderYield),data=loan_data_csv)+
+geom_freqpoly(binwidth=0.05)+
+facet_wrap(~Loan_year)+
+ggtitle("Lender yield per year")
+
+#Clearly lender yield is going up year on year except for 2009
+#2013 has been the best year 2014 data is only partially in
+
+ggplot(aes(x=LenderYield,fill=factor(Loan_year)),
+       data=subset(loan_data_csv,Loan_year %in% c(2011,2012,2013)))+
+geom_histogram(binwidth=0.01)
+
+table(loan_data_csv$Loan_year,loan_data_csv$LenderYield)
+
+```
+
+
+
+```{r echo=FALSE,eval=FALSE}
+###Who is borrowing the loans 
+
+#Plot->Borrower profile
+#Comment->Most borrowers list other as occupation followed by professionals
+#table(loan_data_csv$Occupation)
+ggplot(aes(x=Occupation,ymax=max(..count..)),data=loan_data_csv)+geom_histogram()+
+  theme(axis.text.x = blue.bold.italic.16.text)+
+ stat_bin(aes(y=..count.., label=..count..), geom="text", vjust=-.5,size=4)+
+  ggtitle("Borrower occupation")
+
+library(dplyr)
+#Group by and then see top 5
+loan_data_by_occupation<-
+  loan_data_csv %>%
+  group_by(Occupation) %>%
+  summarise( n=n()) %>%
+  arrange(desc(n))
+head(loan_data_by_occupation)
+
+```
+
+
+
+```{r echo=FALSE,eval=FALSE}
+###How long have the borrowers been employed
+
+#Plot->Borrower profile working history?
+#Comment->Most loans go to full time employed but most people are employed for
+#shorter durations
+
+
+ggplot(aes(x=EmploymentStatus),data=loan_data_csv)+
+geom_histogram()+
+ggtitle("Employment Status spread")
+
+#table(loan_data_csv$EmploymentStatusDuration)
+summary(loan_data_csv$EmploymentStatusDuration)
+
+#Positively skew Mean>Median People employed for shorter durations
+ggplot(aes(x=EmploymentStatusDuration),data=loan_data_csv)+
+geom_histogram(binwidth=10)+
+ggtitle("borrower employment duration")
+
+
+
+``` 
+
+
+
+```{r echo=FALSE,eval=FALSE}
+###How many credit lines do they have ?
+
+table(loan_data_csv$CurrentCreditLines)
+summary(loan_data_csv$CurrentCreditLines)
+ggplot(aes(x=CurrentCreditLines),data=loan_data_csv)+
+  geom_histogram(binwidth=2)+xlim(c(0,60))+
+  ggtitle("Credit lines spread")
+#Slight positive skew mean >median typically  have 10 credit lines
+```
+
+###Debt to income ratio of the borrowers
+
+```{r echo=FALSE,eval=FALSE}
+
+
+summary(loan_data_csv$DebtToIncomeRatio)
+#table(loan_data_csv$DebtToIncomeRatio)
+#Shows a positve skew mean is higher than median 
+ggplot(aes(x=DebtToIncomeRatio),data=loan_data_csv)+
+geom_histogram(fill='light blue')+
+scale_x_continuous(breaks=seq(0,10.010,0.1))+
+xlim(0,10.010)
+
+```
+```{r echo=FALSE}
+
+#Fine tune for people with DI<1
+library(ggplot2)
+ggplot(aes(x=DebtToIncomeRatio), 
+       data=subset(loan_data_csv,loan_data_csv$DebtToIncomeRatio<1)) + 
+geom_histogram(binwidth=0.01,fill='light blue') +
+ggtitle("Debt to Income Ratio<1 spread ")
+
+```
+
+Most people take on reasonable debt but there are few borrowers
+who take on very large debt.
+ 
+###Income range of the borrowers
+
+```{r echo=FALSE}
+#Plot->Income range distribution
+#Comment->Largest group 25-50000
+#table(loan_data_csv$IncomeRange)
+summary(loan_data_csv$IncomeRange)
+ggplot(aes(x=IncomeRange,ymax=max(..count..)),data=loan_data_csv)+geom_histogram()+
+theme(axis.text.x = blue.bold.italic.16.text)+
+stat_bin(aes(y=..count.., label=..count..), geom="text", vjust=-.5,size=4)+
+ylim(0,33000)+
+ggtitle("Income range spread")
+
+```
+
+Largest group of borrowers have an income range of 250000-50000 closely followed  by 50000-75000
+
+```{r echo=FALSE,eval=FALSE}
+#Monthly income distbrution There are some where monthy income is 0??? 
+#Is that even a range? Check what kind of laons are given and how they service?
+
+head(loan_data_csv[which(loan_data_csv$StatedMonthlyIncome==0),
+                   c('StatedMonthlyIncome','IncomeRange')])
+#Stated Monthly income =0 incomerange comes up as NotEmployed I dont think this
+#is an appropriate income range
+
+```
+
+
+
+```{r echo=FALSE,eval=FALSE}
+###Do people need recommendations to get a loan
+
+table(loan_data_csv$Recommendations)
+summary(loan_data_csv$Recommendations)
+##Looks like recommendations are not required
+```
+
+
+```{r echo=FALSE,eval=FALSE}
+###How many houseowners?
+
+prop.table(table(loan_data_csv$IsBorrowerHomeowner))
+```
+
+###What is the lender yield like?
+
+```{r echo=FALSE}
+#Plot->LenderYield
+#Comment->Slight positive skew maximum yield is close to 0.30
+summary(loan_data_csv$LenderYield)
+ggplot(aes(x=LenderYield),data=loan_data_csv)+
+geom_histogram(binwidth=0.005,fill='light blue')  +
+scale_x_continuous(breaks=seq(0, 0.5, 0.05)) + 
+labs(title="The Lender Yield on the Loan")
+```
+
+Lender yield spread is positively skewed large percentage of loans yield close 
+to 0.3%
+
+# Univariate Analysis
+###What is the structure of your dataset?
+Data has 113937 observation with 81 variables
+###What is/are the main feature(s) of interest in your dataset?
+This data set has 81 variables so I chose a subset of the data as features to 
+study.The features chosen are
+
+*BorrowerState
+*LoanOriginalAmount
+*BorrowerAPR
+*ProsperScore
+*LenderYield
+*CreditScoreRangeLower
+
+
+
+###Did you create any new variables from existing variables in the dataset?
+I created 6 variables Loan_year,Loan_month,Loan_closed_Date_month,
+Loan_closed_Date_year,Credit_Type,TotalMonthlyDebt
+
+### What other features in the dataset do you think will help support your
+###investigation into your feature(s) of interest?
+Other features I have used to futher support my investigation are .
+
+*LoanOriginationDate
+*ClosedDate
+*Term
+*BorrowerAPR
+*ProsperScore
+*ListingCategory
+*Occupation
+*EmploymentStatus
+*EmploymentStatusDuration
+*CurrentCreditLines
+*DebtToIncomeRatio
+*IncomeRange
+*StatedMonthlyIncome
+*Recommendations
+
+
+
+### Of the features you investigated, were there any unusual distributions? 
+###Did you perform any operations on the data to tidy, adjust, or change the
+###form of the data? If so, why did you do this?
+The plot of Loan volumes over the years shows that loans have abruptly fallen in
+2009 which was unusual since it was growing year on year from 2005.
+
+
+# Bivariate Plots Section
+###Have lending criteria been stricter
+```{r}
+
+ggplot(aes(x=factor(Loan_year),fill=Credit_Type),data=loan_data_csv)+
+geom_histogram()+
+xlab("Loan_year")+
+ggtitle("Borrower profile over the years")
+
+```
+
+From the graph we can see that credit requirements have become more stricter
+from 2009 onwards loans are given to borrowers with atleast fair credit.
+
+###Loan deliquency over time
+```{r echo=FALSE}
+library(dplyr)
+defaults<-subset(loan_data_csv,(LoanStatus %in% c('Defaulted','ChargedOff')))
+#table(defaults$Loan_year,defaults$LoanStatus)
+#Number of defaulted
+loan_status_default<-loan_data_csv %>%
+  group_by(Loan_year) %>%
+  summarise(CountTotal=n(), 
+            DefaultTotal = sum(LoanStatus %in% c('Defaulted','ChargedOff'))) %>%
+  mutate(percentile = DefaultTotal/CountTotal)
+
+ggplot(aes(x=factor(Loan_year),y=percentile,group=1),data=loan_status_default)+
+geom_line()+
+geom_point()+
+ggtitle("Percentage of defaults from 2005-2014")+
+ylab('Percentage')+
+xlab('Loan_year')
+
+
+```
+
+The plot shows default was very high in 2006 and then has fallen steadily after 
+2009 to 2013 The next question would be why such a dramatic change 
+i.e why have defaults fallen so much have lending standards improved
+
+
+###Does loan's prosper score affect loan Interest rate?
+
+```{r echo=FALSE}
+cor.test(loan_data_csv$ProsperScore,loan_data_csv$BorrowerAPR)
+```
+Prosperscore and BorrowerAPR are strongly negatively corelated
+```{r echo=FALSE}
+ggplot(aes(y=BorrowerAPR,x=factor(ProsperScore)),
+       data=subset(loan_data_csv,!is.na(ProsperScore)))+
+geom_boxplot()+
+ggtitle("Prosper score versus BorrowerAPR")+
+xlab("Prosper score")
+
+```
+
+```{r echo=FALSE,eval=FALSE}
+
+ggplot(aes(x=BorrowerAPR),data=subset(loan_data_csv,!is.na(ProsperScore)))+
+geom_freqpoly(binwidth=0.05)+facet_wrap(~ProsperScore)+
+ggtitle("BorrowerAPR spread")
+
+#As prosperscore increases borrowerAPR decreases(distribution shifts left)
+```
+
+ProsperScore and BorrowerAPR are very negatively correlated
+The graphs Prosper score vs BorrowerAPR and BorrowerAPR spread both indicate
+that Interest rate fall for loans with high prosperscore and vice versa
+
+###LoanOriginalAmount vs ProsperScore
+```{r echo=FALSE}
+cor.test(loan_data_csv$LoanOriginalAmount,loan_data_csv$ProsperScore)
+```
+
+Both loan original amount and prosperscore have a moderate corelation this
+indicates Prosperscore increases these loans could potentially have a larger
+loan amount
+
+```{r echo=FALSE}
+
+ggplot(aes(x=factor(ProsperScore),y=LoanOriginalAmount),data=subset(loan_data_csv,!is.na(ProsperScore)))+
+geom_boxplot()+
+xlab("Prosper score")+
+ggtitle("Prosper score and loan amounts")
+
+```
+
+Plots indicate Loans with low prosperscores have low amounts and those with higher 
+prosper scores can have higher loan amounts 
+
+
+
+###Does credit score infulence borrower APR ?
+```{r echo=FALSE}
+cor.test(loan_data_csv$CreditScoreRangeLower,loan_data_csv$BorrowerAPR)
+```
+
+Both creditscore and borrower interest rate are strongly negatively correlated
+indicating that borrowers with low credit score probably pay more interest and
+borrowers with good credit score pay less interest
+
+```{r echo=FALSE}
+
+ggplot(aes(x=factor(CreditScoreRangeLower),y=BorrowerAPR),data=subset(loan_data_csv,!is.na(CreditScoreRangeLower)))+
+geom_boxplot()+
+xlab("Credit score")+
+ggtitle("BorrowerAPR vs CreditScore")
+
+```
+
+The general trend is that as creditscore increases borrower APR decreases as evidenced by the graph.
+
+###Income vs Loan Amount
+```{r echo=FALSE}
+cor.test(loan_data_csv$StatedMonthlyIncome,loan_data_csv$LoanOriginalAmount)
+
+```
+
+Both monthly income and loan amount are positively correlated this suggests that
+people on higher incomes can potentially take on bigger loans
+```{r echo=FALSE}
+
+#People on larger Income get bigger loans
+ggplot(aes(x=IncomeRange,y=LoanOriginalAmount),
+       data=loan_data_csv)+
+geom_boxplot()+
+ggtitle("Income vs Loan Amount")
+
+```
+
+Plots show that people who are on larger incomes can take on larger loans
+
+```{r echo=FALSE}
+
+cor.test(loan_data_csv$Term,loan_data_csv$LoanOriginalAmount)
+```
+
+LoanOriginalAmount and loan term are positively correlated which implies larger 
+loans are taken over a longer period
+
+```{r echo=FALSE}
+ggplot(aes(x=factor(Term),y=LoanOriginalAmount),data=loan_data_csv)+
+geom_boxplot()+
+ggtitle("Loan term vs Loan amount")+
+xlab("Loan Term")
+
+```
+
+The above plot show that longer term loans are usually larger loans
+
+```{r,echo=FALSE,eval=FALSE}
+#Highter income and lower debtto income ratio this should be true
+cor.test(loan_data_csv$StatedMonthlyIncome,loan_data_csv$DebtToIncomeRatio)
+#negativey corelated i.e as monthly income increases debt to income decreases
+#though Not as strongly negative as I imagined it would be 
+
+
+
+```
+
+
+```{r credit_Score_vs_loanamounts,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE,eval=FALSE}
+cor.test(loan_data_csv$CreditScoreRangeLower,loan_data_csv$LoanOriginalAmount)
+Loan Amounts and credit scores are positively correlated this implies that 
+bigger loan amounts could be granted to borrowers with better credit scores
+
+
+ggplot(aes(x=CreditScoreRangeLower,y=LoanOriginalAmount),
+       data=subset(loan_data_csv,!is.na(CreditScoreRangeLower)))+
+geom_point(alpha=0.05,position=position_jitter(h=0))+
+scale_color_brewer(type = 'div',
+    guide = guide_legend(title = 'Prosper score', reverse = T,
+    override.aes = list(alpha = 1, size = 2))) +
+ggtitle("Credit score vs LoanAmount")+
+xlab("Credit score ")+
+ylab("Loan amount in $")
+
+#From the graph we can conclude larger loans are given to borrowers with 
+#good credit scores .
+
+```
+
+
+###More risk more reward? Lender yield vs Creditscore
+
+```{r echo=FALSE}
+cor.test(loan_data_csv$CreditScoreRangeLower,loan_data_csv$LenderYield)
+```
+
+CreditScore and Lenderyield negatively corelated implying as Credit Scores 
+increases lender yield decreases and viceversa
+
+```{r echo=FALSE}
+
+
+ggplot(aes(x=factor(CreditScoreRangeLower),y=LenderYield),data=loan_data_csv)+
+geom_boxplot()+
+ggtitle("Lender yield vs Creditscore")+
+xlab("Credit score")
+```
+
+As credit score increases lender yield trends down as evidenced by the plot
+
+```{r echo=FALSE,eval=FALSE}
+###Loan amount vs Lender yield
+
+cor.test(loan_data_csv$LoanOriginalAmount,loan_data_csv$LenderYield)
+
+ggplot(aes(y=LenderYield,x=LoanOriginalAmount),
+       data=loan_data_csv)+
+geom_point(alpha=0.01,position=position_jitter(h=0),color='orange')+
+ggtitle('lender yield vs loan amount')
+
+#Lender yield falls as loan amount increases as evidenced by the plot
+
+```
+
+
+
+###Lender yield and prosper score
+```{r echo=FALSE}
+cor.test(loan_data_csv$ProsperScore,loan_data_csv$LenderYield)
+
+```
+
+Lender yield and prosper score are highly negatively correlated
+implying as prosper score increases lender yield decreases and vice versa
+
+```{r echo=FALSE}
+ggplot(aes(y=LenderYield,x=factor(ProsperScore)),
+       data=subset(loan_data_csv,!is.na(ProsperScore)))+
+geom_boxplot()+
+ggtitle("Prosper score vs Lender yield")+
+xlab("Prosper score")
+
+
+
+```
+
+The above plot reaffirms that for loans with high prosper scores the yield falls.
+
+```{r echo=FALSE}
+###Corelate monthly debt vs credit lines
+
+loan_data_csv$TotalMonthlyDebt=loan_data_csv$DebtToIncomeRatio*
+  loan_data_csv$StatedMonthlyIncome
+```
+```{r echo=FALSE,eval=FALSE}
+cor.test(loan_data,_csv$TotalMonthlyDebt,loan_data_csv$CurrentCreditLines)
+
+summary(loan_data_csv$TotalMonthlyDebt)
+#Positively correlated as you have more credit lines you have more debt
+ggplot(aes(y=TotalMonthlyDebt,x=CurrentCreditLines),data=loan_data_csv)+
+geom_point(alpha=0.05)+
+ylim(0,2000)
+
+```
+
+###Lender yield vs borrower apr
+```{r echo=FALSE}
+cor.test(loan_data_csv$LenderYield,loan_data_csv$BorrowerAPR)
+ggplot(aes(x=BorrowerAPR,y=LenderYield),data=subset(loan_data_csv,!is.na(BorrowerAPR)))+
+geom_point(alpha=0.05)+
+geom_smooth(method='lm',color='red')+
+ggtitle("Borrower APR vs Lender yield")
+
+```
+
+Both lender yield and Borrower APR are very highly corelated . The relationship is 
+pretty linear
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the 
+###investigation. How did the feature(s) of interest vary with other features
+###in the dataset?
+
+There is a strong negative relationship between prosperscore and borrowerapr 
+meaning loans with higher scores have lower interest rate.
+
+There is a very strong positive corelation between lender yield and borrowerAPR.
+This implies that loans where lender yield increases have larger interest rates
+
+There is a strong negative corelation between prosperscore and lender yield
+This implies that loans with good prosper scores have lesser yield and viceversa
+
+There is a strong negative correlation between creditscore and borrowerapr i.e
+people with bigger creditscores get cheaper loans
+
+
+LoanAmount and term of loans are positively correlated meaning Larger loans are 
+taken over a longer period of time
+
+There is a Negative correlation between credit scores and lender yield implying
+more risk more reward
+
+
+### Did you observe any interesting relationships between the other features
+###(not the main feature(s) of interest)?
+I found that the lending criteria of prosper has become more stringent .
+Loans are given only to people with reasonably good Credit scores.
+I also noticed default rates have fallen considerably over the years .
+
+### What was the strongest relationship you found?
+The most strongest relationship is between BorrowerAPR and lenderyield. 
+LenderYield is high then borrowerAPR is high and viceversa. This could be true
+since LenderYield is defined as interest rate less service fee i.e BorrowerAPR 
+in some part determines lenderyield 
+
+#Multivariate plots section
+
+
+
+
+```{r lenderyield_vs_loanamount,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE,eval=FALSE}
+###Lender yield vs Loan amount 
+ggplot(aes(y=LenderYield,x=LoanOriginalAmount,color=factor(ProsperScore)),
+       data=subset(loan_data_csv,!is.na(ProsperScore)))+
+geom_point(alpha=0.1)+
+scale_color_brewer(type = 'div',
+    guide = guide_legend(title = 'Prosper score', reverse = T,
+    override.aes = list(alpha = 1, size = 2))) +
+facet_wrap(~Loan_year)
+
+#The above plot is interesting it shows that in 2009 lenders could get good 
+#yields from low risk loans but of late lenders get high return only from
+#high risk loans
+```
+
+
+###Prosper business how much have volumes grown in each state over the years
+
+```{r loan_volumes,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+
+library(dplyr)
+#Which state has taken out the most loans loan distribution
+loan_data_by_state<-loan_data_csv %>%
+                    group_by(BorrowerState,Loan_year) %>%
+                    summarise(n=n())
+
+ggplot(aes(x=Loan_year,y=n),
+       data=subset(loan_data_by_state,
+                   trimws(loan_data_by_state$BorrowerState)!=""))+
+geom_line(color='blue')+
+ylab("Loan volume ")+
+facet_wrap(~BorrowerState)+
+ggtitle("Loan volume spread ")
+```
+
+Some states have an abrupt distribution like IA,ME,ND after further
+research I found that these states have disallowed prosper. CA seems to have 
+the most loans followed by NY ,TX,GA,FL. RI,NV,SD dont have data for 2005-2008 
+Prosper was introduced here after 2008. 
+
+
+
+
+
+###Lenderyield versus DebtToIncomeRatio
+```{r lenderyield_vs_debttoincome,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+
+
+
+#Where is the money?
+
+ggplot(aes(y=LenderYield,x=DebtToIncomeRatio,color=factor(ProsperScore)),
+       data=loan_data_csv)+
+geom_point(na.rm=T)+
+scale_color_brewer(type = 'div',
+    guide = guide_legend(title = 'ProsperScore', reverse = F,
+    override.aes = list(alpha = 1, size = 2)))+
+scale_x_continuous(breaks=seq(0,10,1))
+
+#Scale x axis to look at majority of points 
+
+ggplot(aes(y=LenderYield,x=DebtToIncomeRatio,color=factor(ProsperScore)),
+       data=loan_data_csv)+
+geom_point(na.rm=T,alpha=0.05)+
+scale_color_brewer(type = 'div',
+    guide = guide_legend(title = 'ProsperScore', reverse = F,
+    override.aes = list(alpha = 1, size = 2)))+ 
+scale_x_continuous(breaks=seq(0,3,0.2),limit=c(0,1.6))+
+scale_y_continuous(breaks=seq(0.1,0.35,0.05))
+```
+
+The money is in risky investments as evidenced by graph yield is high
+where the DebtToIncomeRatio>1 .The prosper score of these loans is low.
+
+```{r echo=FALSE,eval=FALSE}
+cor.test(loan_data_csv$LenderYield,loan_data_csv$MonthlyLoanPayment)
+cor.test(loan_data_csv$LoanOriginalAmount,loan_data_csv$MonthlyLoanPayment)
+cor.test(loan_data_csv$StatedMonthlyIncome,loan_data_csv$LoanOriginalAmount)
+summary(loan_data_csv$StatedMonthlyIncome)
+
+```
+###BorrowerAPR versus LoanAmount 
+```{r echo=FALSE}
+
+
+cor.test(loan_data_csv$BorrowerAPR,loan_data_csv$LoanOriginalAmount)
+ggplot(aes(y=BorrowerAPR,x=LoanOriginalAmount,color=factor(Credit_Type)),
+       data=subset(loan_data_csv,!is.na(Credit_Type)))+
+geom_point(na.rm=T)+
+scale_color_brewer(type = 'div',
+    guide = guide_legend(title = 'Credit Type', reverse =F,
+    override.aes = list(alpha = 1))) +
+facet_wrap(~Loan_year)
+
+
+
+
+
+
+
+```
+Good credit scores are able to borrow at a low interest rate on larger loans
+No particular relationship between loan amount and borrowerAPR
+
+###Loan original amount vs Income
+```{r echo=FALSE}
+ggplot(aes(y=LoanOriginalAmount,x=StatedMonthlyIncome,color=EmploymentStatus),
+       data=loan_data_csv)+
+geom_point(na.rm=T,alpha=0.1)+
+xlim(0,10000)+
+scale_color_brewer(type = 'div',
+    guide = guide_legend(title = 'IncomeRange', reverse = F,
+    override.aes = list(alpha = 1, size = 2)))
+
+
+ggplot(aes(y=LoanOriginalAmount,x=StatedMonthlyIncome,color=IncomeRange),
+       data=subset(loan_data_csv,!is.na(Credit_Type)))+
+geom_point(na.rm = T,alpha=0.1)+
+xlim(0,10000)+
+scale_color_brewer(type = 'div',
+    guide = guide_legend(title = 'IncomeRange', reverse = F,
+    override.aes = list(alpha = 1, size = 2)))+
+facet_wrap(~Credit_Type)
+
+```
+
+
+From the above plots it can be concluded people who are employed and 
+on a relatively highwage with good credit score take on higher debts. 
+
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the strengths
+###and limitations of your model.
+```{r  cache=TRUE, cache.path = 'cache/', fig.path='figure/'}
+
+
+lr<-lm(LenderYield~BorrowerAPR+ProsperScore+
+         CreditScoreRangeLower+
+         DebtToIncomeRatio,data=loan_data_csv)
+
+summary(lr)
+
+#r^2 is 0.9876 .The linear model is very good at predicting lenderyield
+#as evidenced by the R^2. The variables are significant hence I have included
+#them all .Some of the independent variables have a high corelation among
+#them so there could be a multicolinearity problem
+
+library(car)
+vif(lr)
+
+#The VIFs are not too large so the model does not exhibit multi colinearity
+```
+A linear models is built predicting Lender yield using Borrower APR.
+The linear model has an R^2 of 0.9876 which is pretty good. All independent 
+variables are significant
+```{r eval=FALSE,echo=FALSE}
+#Linear model to predict Prosper score
+
+lr<-lm(ProsperScore~BorrowerAPR+StatedMonthlyIncome+
+         EmploymentStatusDuration+EmploymentStatus+
+         OnTimeProsperPayments+CreditScoreRangeLower+
+         DebtToIncomeRatio,
+       data=loan_data_csv)
+
+
+
+summary(lr)
+
+#R^2 0.63. The linear model has very few variables but is not that great in
+#predicting Prosperscore as evidenced by R^2
+```
+ 
+
+
+#Multivariate Analysis
+
+
+### Talk about some of the relationships you observed in this part of the 
+###investigation. Were there features that strengthened each other in terms of 
+###looking at your feature(s) of interest?
+
+I observed LoanAmounts versus monthly income using features IncomeRange,
+EmploymentStatus ,Creditscore to understand the relationship further. After
+looking at the plots I could conclude that people who are employed
+with a good salary and reasonable credit scores take on larger loans.
+I also found that lender yield increases in risky investments .
+I also observed that Prosper's lending criteria has become more stricter to 
+what it was a few years back.
+
+### Were there any interesting or surprising interactions between features?
+I observed loan volumes fell off in 2009 .After searching online I found that
+the SEC had put a cease and desist order on Prosper in Nov 2008.It also appears
+from the plots that Prosper have made their lending criteria more stringent 
+from the time they started they seem to give loans only to people with good
+credit history.
+
+
+# Final Plots and Summary
+###Prosper loan volumes by state
+```{r echo=FALSE}
+gg<-ggplot(aes(x=Loan_year,y=n),
+    data=subset(loan_data_by_state,trimws(loan_data_by_state$BorrowerState)!=""))
+gg<-gg+geom_line(color='blue')
+gg<-gg+geom_point()
+gg<-gg+facet_wrap(~BorrowerState, scales = "free_y")
+gg<-gg+theme(axis.text.x = blue.bold.italic.16.text)+
+     ggtitle("Loan volumes by year")
+gg<-gg+xlab("Loan year")
+gg<-gg+ylab("Number of loans")
+gg
+ ```
+
+Loan volumes have increased drastically since 2005 with a dip in 2009.The plot 
+also showed that prosper did not launch in all states simultaneously .In some 
+states it started later like Rhode Island,nevada and south dakota and in some 
+states its still not available like Maine, Iowa, and North Dakota.
+
+###Tightening of Criteria for granting loans 
+```{r echo=FALSE,loan_tightening, cache=TRUE, cache.path = 'cache/', fig.path='figure/'}
+
+loan_data_csv_year_credit<-
+  loan_data_csv %>%
+  filter(!is.na(CreditScoreRangeLower)) %>%
+  group_by(Loan_year,CreditScoreRangeLower) %>%
+  summarize(n=n())
+
+
+loan_data_csv_by_year<-loan_data_csv %>%
+                       group_by(Loan_year) %>%
+                       summarize(total=n())
+
+
+
+loan_data_combi<-merge(loan_data_csv_by_year,loan_data_csv_year_credit,
+                       by='Loan_year')
+loan_data_combi$percent<-loan_data_combi$n/loan_data_combi$total
+
+ggplot(aes(x=CreditScoreRangeLower,y=percent,color=factor(Loan_year)),
+       data=loan_data_combi)+
+geom_line()+
+geom_point()+
+scale_color_brewer(type = 'div',
+    guide = guide_legend(title = 'Loan_year', reverse = T,
+    override.aes = list(alpha = 1, size = 2))) +
+ggtitle("Borrower profile spread by year")+
+xlab("Credit score ")+
+ylab("Percentage of loans ")+
+coord_cartesian(xlim=c(350,880))
+
+```
+
+Borower profile in terms of credit score lower has changed since 2006 to 2014 
+In 2006 we did have some low  <500 loans and in 2014 there are no such loans 
+all are above atleast 600 this could account for more defaults early on .
+
+###Lender yield vs Borrower APR
+
+```{r lenderyield_vs_borrowerapr,cache=TRUE, cache.path = 'cache/', fig.path='figure/',echo=FALSE}
+
+ggplot(aes(y=LenderYield,x=BorrowerAPR,color=factor(ProsperScore)),
+       data=subset(loan_data_csv,!is.na(BorrowerAPR)))+
+  stat_smooth(method=lm,color='red')+
+  geom_point(alpha=0.05)+
+  scale_color_brewer(type = 'div',
+    guide = guide_legend(title = 'Prosper score', reverse = T,
+    override.aes = list(alpha = 1, size = 2))) +
+  coord_cartesian(xlim=c(0.05,0.42))+
+  ggtitle("Lender yield vs BorrowerAPR")+
+  xlab("Borrower interest rate in %")+
+  ylab("Lender yield on loan in %")
+  
+```
+
+The above plot shows that lender yield increases as borrowerAPR of loan 
+increases.Notice that the relationship is linear as evidenced by the red line
+The higher lender yield also corresponds to more riskier loans as 
+evidenced by the color of the points .
+
+
+
+#Reflection
+This data set is pretty large with many different variables. My first difficulty
+was understanding how the business peer to peer lending worked then I tried to 
+understand what the various variables in the data set meant .Initially I choose 
+far too many features then slowly I brought that down to a few main ones. 
+Using EDA I then tried to explore their relationships. I wanted to understand 
+why a lender/borrower would opt for p2p lending rather than go to a bank.
+It would be useful if I could study what the investor return would be using p2p
+and a brick and mortar bank or bonds or shares. 
+Similarly for a borrower what the interest rate  would be for p2p and a 
+standard bank.
+
+
+I then tried to understand what drives the lender yield.The data inconculsively
+shows that like all equities risky behaviour is rewarding 
+I then tried to model what determines lender yield. 
+My model has very few variables and a good R^2.I notice that
+the independent variables are very well corelated so I try to check for multi
+collinearity by calculating VIF(Variance Inflation Factors).These turn out to
+be reasonable so I include all the independent variables in the model.It would
+also be v interesting to model Prosper score.On what basis does Prosper allocate
+Prosperscore to its loans .I did try modelling the same using a linear model but
+my R^2 was not very good 0.63.
+
+I can conclude that a platform like Prosper gives a good returns to investors 
+the number of defaults over the years have fallen since granting of loans is 
+screened more and only worthy borrowers are given loans. Since the P2P lending
+space has become more competitive it would be interesting to see if the returns
+that the investors are currently giving will continue or not.
+
